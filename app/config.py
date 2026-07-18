@@ -8,7 +8,7 @@ def _int(name: str, default: int) -> int:
 
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
-CHAT_MODEL = os.getenv("CHAT_MODEL", "qwen2.5:7b-instruct")
+CHAT_MODEL = os.getenv("CHAT_MODEL", "qwen3.5:9b")
 
 DATA_DIR = Path(os.getenv("DATA_DIR", "data"))
 BUDGET_FILE = DATA_DIR / "budget.json"
