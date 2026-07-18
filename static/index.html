@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ScrapeInsight — pages into data</title>
+  <meta name="description" content="Point it at a web page: a local LLM extracts structured records, pandas computes the stats, and you get charts plus grounded insights.">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#128200;</text></svg>">
+</head>
+<body>
+  <header class="site-head">
+    <div class="brand">
+      <h1>Scrape<span class="accent">Insight</span></h1>
+      <p class="tag">Point it at a page &mdash; get records, charts, and insights that quote the numbers.</p>
+    </div>
+    <div class="status-chip"><span class="pulse" id="status-dot"></span><span id="status-text">checking&hellip;</span></div>
+  </header>
+
+  <main>
+    <form class="ticket" id="ticket" autocomplete="off">
+      <div class="ticket-row">
+        <label class="field grow">
+          <span>URL to analyze</span>
+          <input type="url" id="url" placeholder="https://example.com/products" maxlength="2000">
+        </label>
+        <label class="field">
+          <span>&hellip;or a bundled sample</span>
+          <select id="sample"><option value="">— use URL above —</option></select>
+        </label>
+        <label class="field">
+          <span>What to extract</span>
+          <select id="preset"></select>
+        </label>
+        <button type="submit" id="run-btn">Run</button>
+      </div>
+      <p class="ticket-note">Public http(s) pages only &mdash; private addresses are blocked server-side. A run takes 20&ndash;60s on the rig.</p>
+    </form>
+
+    <ol class="progress" id="progress" hidden>
+      <li data-stage="fetching">fetch page</li>
+      <li data-stage="extracting">extract records <em>(local LLM)</em></li>
+      <li data-stage="analyzing">compute stats + insights</li>
+    </ol>
+
+    <div class="errbar" id="errbar" hidden></div>
+
+    <section class="results" id="results" hidden>
+      <p class="source-line" id="source-line"></p>
+
+      <div class="tiles" id="tiles"></div>
+
+      <div class="insights" id="insights"></div>
+
+      <div class="charts" id="charts"></div>
+
+      <div class="table-card">
+        <p class="section-label">Extracted records</p>
+        <div class="table-scroll"><table id="records"></table></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-foot">
+    <span>Self-hosted demo &middot; extraction + insights run on a private 6-GPU rig &middot; no cloud APIs</span>
+    <span id="limits-line"></span>
+  </footer>
+
+  <script src="/static/chart.umd.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
