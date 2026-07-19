@@ -21,20 +21,12 @@
     <form class="ticket" id="ticket" autocomplete="off">
       <div class="ticket-row">
         <label class="field grow">
-          <span>URL to analyze</span>
-          <input type="url" id="url" placeholder="https://example.com/products" maxlength="2000">
+          <span>Live target &mdash; real brand category pages</span>
+          <select id="target"></select>
         </label>
-        <label class="field">
-          <span>&hellip;or a bundled sample</span>
-          <select id="sample"><option value="">— use URL above —</option></select>
-        </label>
-        <label class="field">
-          <span>What to extract</span>
-          <select id="preset"></select>
-        </label>
-        <button type="submit" id="run-btn">Run</button>
+        <button type="submit" id="run-btn">Run live pull</button>
       </div>
-      <p class="ticket-note">Public http(s) pages only &mdash; private addresses are blocked server-side. A run takes 20&ndash;60s on the rig.</p>
+      <p class="ticket-note">Scrapes the real page at run time &mdash; nothing cached. Demo shows up to <b>16</b> extracted products; full catalogs, custom targets and custom schemas are what client builds unlock.</p>
     </form>
 
     <ol class="progress" id="progress" hidden>
@@ -47,6 +39,8 @@
 
     <section class="results" id="results" hidden>
       <p class="source-line" id="source-line"></p>
+
+      <div class="showcase" id="showcase" hidden></div>
 
       <div class="tiles" id="tiles"></div>
 

@@ -7,13 +7,15 @@ per-IP rate limits, a global daily LLM budget, and security headers.
 import contextlib
 import json
 import logging
+import random
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel
 
 from . import analyze, config, llm, ratelimit, scraper, schemas, ssrf
 
@@ -40,7 +42,7 @@ async def security_headers(request: Request, call_next):
     if request.url.path == "/" or request.url.path.startswith("/static"):
         resp.headers.setdefault(
             "Content-Security-Policy",
-            "default-src 'self'; img-src 'self' data:; style-src 'self'; "
+            "default-src 'self'; img-src 'self' data: https:; style-src 'self'; "
             "script-src 'self'; connect-src 'self'",
         )
     return resp
@@ -59,30 +61,16 @@ async def index():
     return FileResponse(STATIC_DIR / "index.html")
 
 
-@app.get("/api/presets")
-async def presets():
+@app.get("/api/targets")
+async def targets():
     return {
-        "presets": [
-            {"id": pid, "label": p["label"], "hint": p["hint"], "sample": p["sample"]}
-            for pid, p in schemas.PRESETS.items()
-        ],
-        "samples": [
-            {"id": sid, "label": s["label"], "preset": s["preset"]}
-            for sid, s in schemas.SAMPLES.items()
-        ],
+        "targets": [{"id": tid, "label": t["label"]} for tid, t in schemas.TARGETS.items()],
+        "cap": schemas.DISPLAY_CAP,
     }
 
 
 class AnalyzeBody(BaseModel):
-    url: str | None = Field(default=None, max_length=2000)
-    sample: str | None = None
-    preset: str
-
-    @model_validator(mode="after")
-    def one_source(self):
-        if bool(self.url) == bool(self.sample):
-            raise ValueError("Provide either a url or a sample, not both.")
-        return self
+    target: str
 
 
 EXTRACT_PROMPT = (
@@ -108,55 +96,56 @@ async def analyze_page(request: Request, body: AnalyzeBody):
     ip = client_ip(request)
     if not ratelimit.analyze_window.allow(ip):
         raise HTTPException(429, "Analysis limit reached — try again in a few minutes.")
-    if body.preset not in schemas.PRESETS:
-        raise HTTPException(400, "Unknown preset.")
-    if body.sample and body.sample not in schemas.SAMPLES:
-        raise HTTPException(400, "Unknown sample.")
-    if not await ratelimit.spend_budget(2):  # one extract + one insight call
+    if body.target not in schemas.TARGETS:
+        raise HTTPException(400, "Unknown target.")
+    if not await ratelimit.spend_budget(2):  # worst case: one extract + one insight call
         raise HTTPException(429, "Demo budget for today is exhausted — come back tomorrow.")
 
-    preset = schemas.PRESETS[body.preset]
+    target = schemas.TARGETS[body.target]
+    preset = schemas.PRODUCTS_PRESET
 
     async def gen():
-        # 1. Get page text
+        # 1. Live fetch of the curated category page
         try:
-            if body.sample:
-                sample = schemas.SAMPLES[body.sample]
-                html = (config.SAMPLES_DIR / sample["file"]).read_text(encoding="utf-8")
-                source = sample["label"]
-            else:
-                yield _sse("progress", {"stage": "fetching"})
-                source, html = await scraper.fetch_html(body.url)
-            text = scraper.clean_text(html)
-            if not text.strip():
-                yield _sse("error", "That page has no extractable text.")
-                return
+            yield _sse("progress", {"stage": "fetching"})
+            _final_url, html = await scraper.fetch_html(target["url"])
         except (ssrf.BlockedURL, scraper.ScrapeError) as exc:
             yield _sse("error", str(exc))
             return
         except httpx.HTTPError:
-            yield _sse("error", "Could not fetch that page.")
+            yield _sse("error", f"{target['brand']} did not answer just now — try another target.")
             return
 
-        # 2. LLM extraction (schema-constrained)
+        # 2. Extraction: deterministic JSON-LD first, LLM fallback second
         yield _sse("progress", {"stage": "extracting"})
-        try:
-            raw = await llm.chat_json(
-                EXTRACT_PROMPT.format(label=preset["label"], max_records=config.MAX_RECORDS),
-                text,
-                preset["schema"],
-            )
-        except (httpx.HTTPError, ValueError):
-            yield _sse("error", "The model backend failed during extraction.")
-            return
-        records = [r for r in raw.get("items", []) if isinstance(r, dict)][: config.MAX_RECORDS]
+        records = scraper.jsonld_products(html, category=target["category"])
+        extraction = "structured"
+        if len(records) < 3:
+            extraction = "llm"
+            text = scraper.clean_text(html)
+            try:
+                raw = await llm.chat_json(
+                    EXTRACT_PROMPT.format(label=preset["label"], max_records=config.MAX_RECORDS),
+                    text,
+                    preset["schema"],
+                )
+                records = [
+                    {**r, "category": target["category"], "url": None, "image": None}
+                    for r in raw.get("items", [])
+                    if isinstance(r, dict)
+                ]
+            except (httpx.HTTPError, ValueError):
+                yield _sse("error", "The model backend failed during extraction.")
+                return
+        records = records[: config.MAX_RECORDS]
         if not records:
-            yield _sse("error", "No records matching this preset were found on the page.")
+            yield _sse("error", "No products could be extracted from that page right now.")
             return
 
-        # 3. Deterministic analysis
+        # 3. Deterministic analysis over EVERYTHING found; display gets capped
         yield _sse("progress", {"stage": "analyzing"})
         stats = analyze.analyze(records, preset)
+        showcase = random.choice(records)
 
         # 4. Grounded insights
         try:
@@ -172,9 +161,18 @@ async def analyze_page(request: Request, body: AnalyzeBody):
         yield _sse(
             "result",
             {
-                "source": source,
-                "preset": body.preset,
-                "records": records,
+                "source": {
+                    "label": target["label"],
+                    "brand": target["brand"],
+                    "category": target["category"],
+                    "url": target["url"],
+                },
+                "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "extraction": extraction,
+                "total_found": len(records),
+                "cap": schemas.DISPLAY_CAP,
+                "records": records[: schemas.DISPLAY_CAP],
+                "showcase": showcase,
                 "stats": stats,
                 "insights": insights,
                 "model": config.CHAT_MODEL,

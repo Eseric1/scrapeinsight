@@ -12,7 +12,6 @@ CHAT_MODEL = os.getenv("CHAT_MODEL", "qwen3.5:9b")
 
 DATA_DIR = Path(os.getenv("DATA_DIR", "data"))
 BUDGET_FILE = DATA_DIR / "budget.json"
-SAMPLES_DIR = Path(__file__).resolve().parent.parent / "samples"
 
 # Fetch guards
 FETCH_MAX_BYTES = _int("FETCH_MAX_BYTES", 2_000_000)

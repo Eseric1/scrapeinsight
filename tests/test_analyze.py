@@ -1,5 +1,5 @@
 from app.analyze import analyze
-from app.schemas import PRESETS
+from app.schemas import PRODUCTS_PRESET
 
 
 RECORDS = [
@@ -12,14 +12,14 @@ RECORDS = [
 
 
 def test_numeric_stats():
-    stats = analyze(RECORDS, PRESETS["products"])
+    stats = analyze(RECORDS, PRODUCTS_PRESET)
     assert stats["row_count"] == 5
     price = stats["numeric"]["price"]
     assert price == {"count": 5, "mean": 300.0, "median": 300.0, "min": 100.0, "max": 500.0}
 
 
 def test_charts_present():
-    stats = analyze(RECORDS, PRESETS["products"])
+    stats = analyze(RECORDS, PRODUCTS_PRESET)
     ids = {c["id"] for c in stats["charts"]}
     assert "hist-price" in ids
     assert "top-category" in ids
@@ -27,7 +27,7 @@ def test_charts_present():
 
 
 def test_category_counts():
-    stats = analyze(RECORDS, PRESETS["products"])
+    stats = analyze(RECORDS, PRODUCTS_PRESET)
     assert stats["categories"]["category"] == {"Gaming": 3, "Budget": 2}
 
 
@@ -37,12 +37,12 @@ def test_handles_missing_and_dirty_values():
         {"name": "B"},
         {"name": "C", "price": 50},
     ]
-    stats = analyze(dirty, PRESETS["products"])
+    stats = analyze(dirty, PRODUCTS_PRESET)
     assert stats["row_count"] == 3
     assert stats["numeric"]["price"]["count"] == 1
 
 
 def test_empty_records():
-    stats = analyze([], PRESETS["products"])
+    stats = analyze([], PRODUCTS_PRESET)
     assert stats["row_count"] == 0
     assert stats["charts"] == []

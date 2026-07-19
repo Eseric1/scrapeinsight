@@ -19,34 +19,16 @@ if (window.Chart) {
   Chart.defaults.color = INK2;
 }
 
-async function loadPresets() {
-  const r = await fetch("/api/presets");
+async function loadTargets() {
+  const r = await fetch("/api/targets");
   const j = await r.json();
-  for (const p of j.presets) {
+  for (const t of j.targets) {
     const o = document.createElement("option");
-    o.value = p.id;
-    o.textContent = p.label;
-    $("preset").appendChild(o);
-  }
-  for (const s of j.samples) {
-    const o = document.createElement("option");
-    o.value = s.id;
-    o.textContent = s.label;
-    o.dataset.preset = s.preset;
-    $("sample").appendChild(o);
+    o.value = t.id;
+    o.textContent = t.label;
+    $("target").appendChild(o);
   }
 }
-
-$("sample").addEventListener("change", () => {
-  const opt = $("sample").selectedOptions[0];
-  if (opt && opt.dataset.preset) {
-    $("preset").value = opt.dataset.preset;
-    $("url").value = "";
-  }
-});
-$("url").addEventListener("input", () => {
-  if ($("url").value) $("sample").value = "";
-});
 
 async function refreshStatus() {
   try {
@@ -74,16 +56,7 @@ async function refreshLimits() {
 $("ticket").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (running) return;
-  const url = $("url").value.trim();
-  const sample = $("sample").value;
-  if (!url && !sample) {
-    showError("Give me a URL or pick a sample.");
-    return;
-  }
-  const body = { preset: $("preset").value };
-  if (sample) body.sample = sample;
-  else body.url = url;
-  await run(body);
+  await run({ target: $("target").value });
 });
 
 function setStage(stage) {
@@ -106,7 +79,7 @@ async function run(body) {
   $("errbar").hidden = true;
   $("results").hidden = true;
   $("progress").hidden = false;
-  setStage(body.sample ? "extracting" : "fetching");
+  setStage("fetching");
 
   try {
     const r = await fetch("/api/analyze", {
@@ -177,19 +150,62 @@ function showError(msg) {
 }
 
 function renderResult(data) {
-  $("source-line").textContent = "";
   const src = $("source-line");
-  src.append("source: ");
-  const b = el("b", null, data.source);
-  src.append(b, ` · model: ${data.model} · ${data.stats.row_count} records extracted`);
+  src.textContent = "";
+  const time = (data.fetched_at || "").replace("T", " ").replace("+00:00", " UTC");
+  src.append("live pull · ");
+  src.appendChild(el("b", null, data.source.label));
+  src.append(
+    ` · ${time} · ${data.total_found} products found — showing ${data.records.length}` +
+    (data.extraction === "structured" ? " · structured-data extraction" : " · LLM extraction")
+  );
 
+  renderShowcase(data.showcase, data.source);
   renderTiles(data.stats);
   renderInsights(data.insights);
   renderCharts(data.stats.charts);
-  renderTable(data.records);
+  renderTable(data.records, data.total_found);
 
   $("results").hidden = false;
   $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderShowcase(p, source) {
+  const box = $("showcase");
+  box.textContent = "";
+  if (!p) {
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+  box.appendChild(el("span", "sc-badge", "LIVE PULL · random product from this run"));
+  const row = el("div", "sc-row");
+  if (p.image) {
+    const img = document.createElement("img");
+    img.src = p.image;
+    img.alt = p.name;
+    img.loading = "lazy";
+    img.className = "sc-img";
+    row.appendChild(img);
+  }
+  const info = el("div", "sc-info");
+  info.appendChild(el("p", "sc-name", p.name));
+  const bits = [];
+  if (p.price != null) bits.push(`$${fmt(p.price)}`);
+  if (p.rating != null) bits.push(`rated ${fmt(p.rating)}`);
+  bits.push(source.category);
+  info.appendChild(el("p", "sc-meta", bits.join(" · ")));
+  if (p.url) {
+    const a = document.createElement("a");
+    a.href = p.url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.className = "sc-link";
+    a.textContent = "view it on the site ↗";
+    info.appendChild(a);
+  }
+  row.appendChild(info);
+  box.appendChild(row);
 }
 
 function renderTiles(stats) {
@@ -292,14 +308,15 @@ function renderCharts(charts) {
   }
 }
 
-function renderTable(records) {
+function renderTable(records, totalFound) {
   const table = $("records");
   table.textContent = "";
+  const note = document.querySelector(".table-note");
+  if (note) note.remove();
   if (!records.length) return;
-  const cols = [];
-  for (const r of records) {
-    for (const k of Object.keys(r)) if (!cols.includes(k)) cols.push(k);
-  }
+  const cols = ["name", "price", "rating", "category"].filter((c) =>
+    records.some((r) => r[c] != null)
+  );
   const thead = el("thead");
   const hr = el("tr");
   cols.forEach((c) => hr.appendChild(el("th", null, c)));
@@ -316,11 +333,16 @@ function renderTable(records) {
     tbody.appendChild(tr);
   }
   table.append(thead, tbody);
+  if (totalFound > records.length) {
+    const n = el("p", "table-note",
+      `Demo cap: showing ${records.length} of ${totalFound} products extracted — the full set (and full catalogs) comes with a client build.`);
+    table.closest(".table-card").appendChild(n);
+  }
 }
 
 /* ---------- go ---------- */
 
-loadPresets();
+loadTargets();
 refreshStatus();
 refreshLimits();
 setInterval(refreshStatus, 30000);
