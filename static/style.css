@@ -36,6 +36,13 @@
 
 * { box-sizing: border-box; margin: 0; }
 
+html { color-scheme: light; }
+
+select option {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
 body {
   min-height: 100vh;
   display: flex;
