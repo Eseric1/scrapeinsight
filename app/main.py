@@ -201,8 +201,8 @@ async def health():
         info = await llm.healthy()
         ready = any(m.split(":")[0] == config.CHAT_MODEL.split(":")[0] for m in info["models"])
     except Exception:
-        return {"ok": False, "chat_model": config.CHAT_MODEL}
-    return {"ok": ready, "chat_model": config.CHAT_MODEL}
+        return {"ok": False, "chat_model": config.CHAT_MODEL, "warm": False}
+    return {"ok": ready, "chat_model": config.CHAT_MODEL, "warm": await llm.loaded()}
 
 
 @app.get("/api/limits")

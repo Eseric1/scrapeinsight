@@ -10,6 +10,10 @@ const BLUE = "#2d62c1";
 
 let chartInstances = [];
 let running = false;
+let warm = false;
+
+const WARM_MSG =
+  "⚡ first run after an idle stretch wakes the GPU — allow ~20 extra seconds for the insight step";
 
 /* ---------- boot ---------- */
 
@@ -33,8 +37,9 @@ async function loadTargets() {
 async function refreshStatus() {
   try {
     const j = await (await fetch("/api/health")).json();
+    warm = !!j.warm;
     $("status-dot").className = "pulse " + (j.ok ? "ok" : "bad");
-    $("status-text").textContent = j.ok ? j.chat_model : "backend offline";
+    $("status-text").textContent = j.ok ? j.chat_model + (j.warm ? "" : " · idle") : "backend offline";
   } catch {
     $("status-dot").className = "pulse bad";
     $("status-text").textContent = "backend offline";
@@ -80,6 +85,13 @@ async function run(body) {
   $("results").hidden = true;
   $("progress").hidden = false;
   setStage("fetching");
+  let warmNote = null;
+  if (!warm) {
+    warmNote = document.createElement("p");
+    warmNote.className = "warming-note";
+    warmNote.textContent = WARM_MSG;
+    $("progress").after(warmNote);
+  }
 
   try {
     const r = await fetch("/api/analyze", {
@@ -97,6 +109,7 @@ async function run(body) {
       else if (ev.event === "error") throw new Error(ev.data);
       else if (ev.event === "result") {
         got = true;
+        warm = true;
         renderResult(ev.data);
       }
     }
@@ -104,6 +117,7 @@ async function run(body) {
   } catch (err) {
     showError(err.message || "Something went wrong.");
   } finally {
+    if (warmNote) warmNote.remove();
     running = false;
     $("run-btn").disabled = false;
     $("progress").hidden = true;

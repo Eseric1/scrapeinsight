@@ -49,5 +49,9 @@ def fake_llm(monkeypatch):
         return {"ok": True, "models": [config.CHAT_MODEL]}
 
     monkeypatch.setattr(llm, "chat_json", fake_chat_json)
+    async def fake_loaded():
+        return True
+
     monkeypatch.setattr(llm, "healthy", fake_healthy)
+    monkeypatch.setattr(llm, "loaded", fake_loaded)
     return llm

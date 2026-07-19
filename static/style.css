@@ -203,6 +203,13 @@ main {
 .progress li.done { color: var(--ink); }
 .progress li.done::before { background: var(--ink); border-color: var(--ink); }
 
+.warming-note {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--orange);
+  padding: 0.2rem 0.2rem 0.8rem;
+}
+
 .errbar {
   margin: 0.8rem 0;
   border: 1.5px solid var(--orange);

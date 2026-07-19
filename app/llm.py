@@ -92,6 +92,17 @@ async def chat_json(system: str, user: str, schema: dict) -> dict:
     return parse_json_content(resp.json()["message"]["content"])
 
 
+async def loaded() -> bool:
+    """True when the chat model is resident in VRAM (no cold-load pause)."""
+    try:
+        resp = await client().get("/api/ps")
+        resp.raise_for_status()
+        base = config.CHAT_MODEL.split(":")[0]
+        return any(m["name"].split(":")[0] == base for m in resp.json().get("models", []))
+    except Exception:
+        return False
+
+
 async def healthy() -> dict:
     resp = await client().get("/api/tags")
     resp.raise_for_status()
