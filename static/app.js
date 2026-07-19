@@ -198,7 +198,7 @@ function renderShowcase(p, source) {
     const img = document.createElement("img");
     img.src = p.image;
     img.alt = p.name;
-    img.loading = "lazy";
+    img.loading = "eager";
     img.className = "sc-img";
     row.appendChild(img);
   }

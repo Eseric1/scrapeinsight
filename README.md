@@ -1,8 +1,8 @@
 # ScrapeInsight — point it at a page, get data
 
-Give it a URL. A local LLM extracts **structured records** (schema-enforced JSON — products, posts, whatever the preset defines), pandas computes the statistics, Chart.js draws them, and the model writes three insight bullets that are **only allowed to quote the computed numbers**. Scrape → dataset → dashboard in one run, entirely on self-hosted hardware.
+Pick a live brand target. The scraper pulls the real page, deterministic parsers extract **structured product records** (with a local LLM as fallback), pandas computes the statistics, Chart.js draws them, and the model writes three insight bullets that are **only allowed to quote the computed numbers**. Scrape → dataset → dashboard in one run, entirely on self-hosted hardware.
 
-> **Live demo:** _URL coming after deploy_ · Built and served from a 6-GPU home rig.
+> **Live demo:** https://performance-donated-poem-portion.trycloudflare.com — served from a 6-GPU home rig (demo URL rotates occasionally; the current one is always on my profile).
 
 ![ScrapeInsight screenshot](docs/screenshot.png)
 
@@ -10,9 +10,10 @@ Give it a URL. A local LLM extracts **structured records** (schema-enforced JSON
 
 ```mermaid
 flowchart LR
-    U[URL or bundled sample] -->|SSRF-guarded fetch| H[HTML]
+    U[Curated brand target] -->|SSRF-guarded live fetch| H[HTML / JSON]
     H -->|BeautifulSoup cleanup| T[Page text]
-    T -->|"local LLM + JSON schema (Ollama format)"| R[Structured records]
+    H -->|"JSON-LD / Shopify parsers (code)"| R[Structured records]
+    T -->|"local LLM fallback"| R
     R -->|pandas| S[Stats: means, medians,\ndistributions, breakdowns]
     S --> C[Chart.js dashboard]
     S -->|stats JSON only| I[3 insight bullets\ngrounded in the numbers]
@@ -26,7 +27,8 @@ The division of labor is deliberate: **the LLM does language, the code does math
 - **Hard resource caps.** 2 MB response cap enforced while streaming, fetch timeouts, redirect limit, page-text truncation, record cap.
 - **Built to be public.** Per-IP rate limits, a persisted daily LLM budget that fails closed, CSP + security headers, XSS-safe rendering.
 - **Progress over SSE.** Fetch → extract → analyze stages stream to the UI, so a 30-second run never looks frozen (and never trips proxy idle timeouts).
-- **Bundled samples.** Two self-authored sample pages let anyone try it without scraping a third party.
+- **Curated live targets.** Nine well-known brand category pages (LEGO, IKEA, Keychron, 8BitDo, Spigen, Wyze, Satechi, Twelve South, MOFT), each probed for scrapability — free-URL input is deliberately removed from the public demo.
+- **Deterministic-first extraction.** schema.org JSON-LD and Shopify products.json are parsed in code; the LLM is only a fallback. Each run shows a random product pulled live — real URL, real image — plus a 16-record demo cap with the full count stated.
 
 ## Stack
 
