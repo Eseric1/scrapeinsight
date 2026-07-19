@@ -51,6 +51,70 @@ async def fetch_html(url: str) -> tuple[str, str]:
     raise ScrapeError("Too many redirects.")
 
 
+async def fetch_json(url: str) -> tuple[str, dict]:
+    """Guarded fetch of a public JSON endpoint (Shopify products.json)."""
+    for _ in range(config.MAX_REDIRECTS + 1):
+        ssrf.validate_public_url(url)
+        async with httpx.AsyncClient(
+            timeout=config.FETCH_TIMEOUT_S,
+            follow_redirects=False,
+            headers={"User-Agent": UA},
+        ) as client:
+            async with client.stream("GET", url) as resp:
+                if resp.status_code in REDIRECT_CODES:
+                    loc = resp.headers.get("location")
+                    if not loc:
+                        raise ScrapeError("Redirect without a location.")
+                    url = urljoin(url, loc)
+                    continue
+                if resp.status_code != 200:
+                    raise ScrapeError(f"Endpoint returned HTTP {resp.status_code}.")
+                chunks: list[bytes] = []
+                size = 0
+                async for chunk in resp.aiter_bytes():
+                    size += len(chunk)
+                    if size > config.FETCH_MAX_BYTES:
+                        raise ScrapeError("Response is too large for the demo.")
+                    chunks.append(chunk)
+        try:
+            return url, json.loads(b"".join(chunks))
+        except ValueError as exc:
+            raise ScrapeError("Endpoint did not return JSON.") from exc
+    raise ScrapeError("Too many redirects.")
+
+
+def shopify_products(data: dict, base: str, category: str | None = None) -> list[dict]:
+    """Deterministic records from a Shopify products.json payload.
+
+    Price = cheapest variant (bundles otherwise distort stats)."""
+    records, seen = [], set()
+    for p in data.get("products", []):
+        name = str(p.get("title") or "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        prices = []
+        for v in p.get("variants") or []:
+            try:
+                prices.append(float(v.get("price")))
+            except (TypeError, ValueError):
+                pass
+        images = p.get("images") or []
+        image = images[0].get("src") if images and isinstance(images[0], dict) else None
+        handle = p.get("handle")
+        records.append(
+            {
+                "name": name[:160],
+                "price": min(prices) if prices else None,
+                "rating": None,
+                "category": category,
+                "url": f"{base}/products/{handle}" if handle else None,
+                "image": image if isinstance(image, str) and image.startswith("http") else None,
+            }
+        )
+    return records
+
+
 def _price(offers):
     """Pull a numeric price out of the many shapes schema.org offers take."""
     if isinstance(offers, list):

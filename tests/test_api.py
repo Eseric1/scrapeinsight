@@ -46,7 +46,7 @@ def test_live_target_flow_structured(fake_llm, monkeypatch):
     _patch_fetch(monkeypatch, _jsonld_page(20))
     with TestClient(app) as client:
         with client.stream(
-            "POST", "/api/analyze", json={"target": "lego-star-wars"}
+            "POST", "/api/analyze", json={"target": "lego"}
         ) as r:
             assert r.status_code == 200
             body = "".join(r.iter_text())
@@ -67,13 +67,42 @@ def test_llm_fallback_when_no_jsonld(fake_llm, monkeypatch):
     _patch_fetch(monkeypatch, "<html><body><p>Widget A $10. Widget B $20. Widget C $30.</p></body></html>")
     with TestClient(app) as client:
         with client.stream(
-            "POST", "/api/analyze", json={"target": "ikea-desks"}
+            "POST", "/api/analyze", json={"target": "ikea"}
         ) as r:
             body = "".join(r.iter_text())
         assert "event: result" in body
         payload = json.loads(body.split("event: result\ndata: ")[1].split("\n")[0])
         assert payload["extraction"] == "llm"
-        assert payload["records"][0]["category"] == "Desks"
+        assert payload["records"][0]["category"] == "Furniture"
+
+
+def test_shopify_target_flow(fake_llm, monkeypatch):
+    data = {
+        "products": [
+            {
+                "title": f"Gadget {i}",
+                "handle": f"gadget-{i}",
+                "variants": [{"price": str(10 + i)}, {"price": str(50 + i)}],
+                "images": [{"src": f"https://cdn.example.com/{i}.jpg"}],
+            }
+            for i in range(20)
+        ]
+    }
+
+    async def fake_fetch_json(url):
+        return url, data
+
+    monkeypatch.setattr(scraper, "fetch_json", fake_fetch_json)
+    with TestClient(app) as client:
+        with client.stream("POST", "/api/analyze", json={"target": "keychron"}) as r:
+            body = "".join(r.iter_text())
+        payload = json.loads(body.split("event: result\ndata: ")[1].split("\n")[0])
+        assert payload["extraction"] == "structured"
+        assert payload["total_found"] == 20
+        assert len(payload["records"]) == 16
+        assert payload["records"][0]["price"] == 10.0  # cheapest variant
+        assert payload["records"][0]["url"] == "https://www.keychron.com/products/gadget-0"
+        assert payload["showcase"]["image"].startswith("https://cdn.example.com/")
 
 
 def test_unknown_target_400(fake_llm):
@@ -94,9 +123,9 @@ def test_rate_limited(fake_llm, monkeypatch):
         old = ratelimit.analyze_window.limit
         ratelimit.analyze_window.limit = 1
         try:
-            with client.stream("POST", "/api/analyze", json={"target": "lego-city"}) as r:
+            with client.stream("POST", "/api/analyze", json={"target": "lego"}) as r:
                 "".join(r.iter_text())
-            r2 = client.post("/api/analyze", json={"target": "lego-city"})
+            r2 = client.post("/api/analyze", json={"target": "lego"})
             assert r2.status_code == 429
         finally:
             ratelimit.analyze_window.limit = old
@@ -107,7 +136,7 @@ def test_budget_exhaustion(fake_llm, monkeypatch):
 
     monkeypatch.setattr(config, "DAILY_LLM_BUDGET", 1)
     with TestClient(app) as client:
-        r = client.post("/api/analyze", json={"target": "lego-city"})
+        r = client.post("/api/analyze", json={"target": "lego"})
         assert r.status_code == 429
 
 
@@ -115,8 +144,8 @@ def test_targets_endpoint(fake_llm):
     with TestClient(app) as client:
         j = client.get("/api/targets").json()
         assert j["cap"] == 16
-        assert len(j["targets"]) == 6
-        assert any(t["id"] == "ikea-sofas" for t in j["targets"])
+        assert len(j["targets"]) == 9
+        assert any(t["id"] == "wyze" for t in j["targets"])
 
 
 def test_security_headers(fake_llm):

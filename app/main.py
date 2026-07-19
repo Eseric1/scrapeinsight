@@ -105,10 +105,22 @@ async def analyze_page(request: Request, body: AnalyzeBody):
     preset = schemas.PRODUCTS_PRESET
 
     async def gen():
-        # 1. Live fetch of the curated category page
+        # 1. Live fetch + extraction, deterministic-first
         try:
             yield _sse("progress", {"stage": "fetching"})
-            _final_url, html = await scraper.fetch_html(target["url"])
+            if target["mode"] == "shopify":
+                _u, data = await scraper.fetch_json(target["url"])
+                yield _sse("progress", {"stage": "extracting"})
+                records = scraper.shopify_products(
+                    data, target["base"], category=target["category"]
+                )
+                extraction = "structured"
+                html = None
+            else:
+                _u, html = await scraper.fetch_html(target["url"])
+                yield _sse("progress", {"stage": "extracting"})
+                records = scraper.jsonld_products(html, category=target["category"])
+                extraction = "structured"
         except (ssrf.BlockedURL, scraper.ScrapeError) as exc:
             yield _sse("error", str(exc))
             return
@@ -116,11 +128,8 @@ async def analyze_page(request: Request, body: AnalyzeBody):
             yield _sse("error", f"{target['brand']} did not answer just now — try another target.")
             return
 
-        # 2. Extraction: deterministic JSON-LD first, LLM fallback second
-        yield _sse("progress", {"stage": "extracting"})
-        records = scraper.jsonld_products(html, category=target["category"])
-        extraction = "structured"
-        if len(records) < 3:
+        # 2. LLM fallback (JSON-LD pages only)
+        if len(records) < 3 and html is not None:
             extraction = "llm"
             text = scraper.clean_text(html)
             try:

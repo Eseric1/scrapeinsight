@@ -10,41 +10,75 @@ DISPLAY_CAP = 16
 
 
 TARGETS: dict[str, dict] = {
-    "lego-star-wars": {
-        "label": "LEGO — Star Wars sets",
+    "lego": {
+        "label": "LEGO — all sets",
         "brand": "LEGO",
-        "category": "Star Wars sets",
-        "url": "https://www.lego.com/en-us/themes/star-wars",
+        "category": "LEGO sets",
+        "mode": "jsonld",
+        "url": "https://www.lego.com/en-us/categories/all-sets",
     },
-    "lego-technic": {
-        "label": "LEGO — Technic sets",
-        "brand": "LEGO",
-        "category": "Technic sets",
-        "url": "https://www.lego.com/en-us/themes/technic",
-    },
-    "lego-city": {
-        "label": "LEGO — City sets",
-        "brand": "LEGO",
-        "category": "City sets",
-        "url": "https://www.lego.com/en-us/themes/city",
-    },
-    "ikea-desks": {
-        "label": "IKEA — Desks",
+    "ikea": {
+        "label": "IKEA — furniture",
         "brand": "IKEA",
-        "category": "Desks",
-        "url": "https://www.ikea.com/us/en/cat/desks-20649/",
+        "category": "Furniture",
+        "mode": "jsonld",
+        "url": "https://www.ikea.com/us/en/cat/furniture-fu001/",
     },
-    "ikea-chairs": {
-        "label": "IKEA — Office chairs",
-        "brand": "IKEA",
-        "category": "Office chairs",
-        "url": "https://www.ikea.com/us/en/cat/office-chairs-20652/",
+    "keychron": {
+        "label": "Keychron — mechanical keyboards",
+        "brand": "Keychron",
+        "category": "Keyboards",
+        "mode": "shopify",
+        "url": "https://www.keychron.com/collections/keyboard/products.json?limit=30",
+        "base": "https://www.keychron.com",
     },
-    "ikea-sofas": {
-        "label": "IKEA — Sofas",
-        "brand": "IKEA",
-        "category": "Sofas",
-        "url": "https://www.ikea.com/us/en/cat/sofas-fu003/",
+    "8bitdo": {
+        "label": "8BitDo — game controllers",
+        "brand": "8BitDo",
+        "category": "Game controllers",
+        "mode": "shopify",
+        "url": "https://shop.8bitdo.com/collections/all/products.json?limit=30",
+        "base": "https://shop.8bitdo.com",
+    },
+    "spigen": {
+        "label": "Spigen — cases & chargers",
+        "brand": "Spigen",
+        "category": "Phone accessories",
+        "mode": "shopify",
+        "url": "https://www.spigen.com/collections/all/products.json?limit=30",
+        "base": "https://www.spigen.com",
+    },
+    "wyze": {
+        "label": "Wyze — smart home",
+        "brand": "Wyze",
+        "category": "Smart home",
+        "mode": "shopify",
+        "url": "https://www.wyze.com/collections/all/products.json?limit=30",
+        "base": "https://www.wyze.com",
+    },
+    "satechi": {
+        "label": "Satechi — Mac & USB-C accessories",
+        "brand": "Satechi",
+        "category": "Tech accessories",
+        "mode": "shopify",
+        "url": "https://satechi.net/collections/all/products.json?limit=30",
+        "base": "https://satechi.net",
+    },
+    "twelvesouth": {
+        "label": "Twelve South — Apple accessories",
+        "brand": "Twelve South",
+        "category": "Apple accessories",
+        "mode": "shopify",
+        "url": "https://www.twelvesouth.com/collections/all/products.json?limit=30",
+        "base": "https://www.twelvesouth.com",
+    },
+    "moft": {
+        "label": "MOFT — stands & wallets",
+        "brand": "MOFT",
+        "category": "Stands & wallets",
+        "mode": "shopify",
+        "url": "https://www.moft.us/collections/all-products/products.json?limit=30",
+        "base": "https://www.moft.us",
     },
 }
 
